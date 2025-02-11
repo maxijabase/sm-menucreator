@@ -572,7 +572,7 @@ public Action Command_OpenDynamicList(int iArgc)
   szCommand[strlen(szCommand) - iStartPos] = 0;
   
   Handle hMenu = CreateMenu(Handle_DynamicList);
-  SetMenuTitle(hMenu, "Выберите игрока:\n ");
+  SetMenuTitle(hMenu, "Select player:\n ");
   
   char szInfo[32], szName[32];
   if (!strcmp(szHandleName, "clients1") || !strcmp(szHandleName, "clients2") || 
