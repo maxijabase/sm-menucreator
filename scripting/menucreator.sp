@@ -5,10 +5,10 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "3.0.0.2"
+#define PLUGIN_VERSION "3.1"
 public Plugin myinfo = 
 {
-  name = "[ Menu Creator ]", 
+  name = "Menu Creator", 
   author = "AlexTheRegent", 
   description = "Simple creating of menu and panels for Source Games", 
   version = PLUGIN_VERSION, 
@@ -26,7 +26,7 @@ Handle g_hCurrentHandle;
 bool g_bIsHandlePanel;
 
 StringMap g_hTrie_ClientCookies[MAXPLAYERS + 1];
-Handle g_hCurrentPanel[MAXPLAYERS + 1];
+Panel g_hCurrentPanel[MAXPLAYERS + 1];
 char g_szOnClientPostAdminCheck[256];
 
 public void OnPluginStart()
@@ -40,6 +40,21 @@ public void OnPluginStart()
   g_hTrie_HandleToShowTime = new StringMap();
   g_hKeyValues_PanelCommands = new KeyValues("commands");
   
+  LoadTranslations("core.phrases");
+
+  BuildCustomMenus();
+  
+  RegServerCmd("sm_mc_om", Command_OpenMenu);
+  RegServerCmd("sm_mc_ol", Command_OpenList);
+  RegServerCmd("sm_mc_odl", Command_OpenDynamicList);
+  RegServerCmd("sm_mc_ourl", Command_OpenUrl);
+  RegServerCmd("sm_mc_fc", Command_FakeCommand);
+  
+  CreateConVar("sm_mc_onpostadmin", "", "command executed by player after connecting to server");
+  AutoExecConfig(true, "menu_creator");
+}
+
+void BuildCustomMenus() {
   // path to config file
   char szConfigFile[PLATFORM_MAX_PATH];
   BuildPath(Path_SM, szConfigFile, sizeof(szConfigFile), "configs/menu_creator.txt");
@@ -105,22 +120,6 @@ public void OnPluginStart()
       }
     }
   }
-  
-  RegServerCmd("sm_mc_om", Command_OpenMenu);
-  RegServerCmd("sm_mc_ol", Command_OpenList);
-  RegServerCmd("sm_mc_odl", Command_OpenDynamicList);
-  RegServerCmd("sm_mc_ourl", Command_OpenUrl);
-  RegServerCmd("sm_mc_fc", Command_FakeCommand);
-  
-  CreateConVar("sm_mc_onpostadmin", "", "команда, выполняемая от лица игрока после входа на сервер");
-  AutoExecConfig(true, "menu_creator");
-
-  LoadTranslations("core.phrases");
-}
-
-public void OnMapStart()
-{
-  
 }
 
 public void OnConfigsExecuted()
@@ -349,7 +348,7 @@ public Action Command_DisplayHandle(int iClient, int iArgc)
   bool bIsHandlePanel; g_hTrie_HandleToHandleType.GetValue(szHandle, bIsHandlePanel);
   int iShowTime; g_hTrie_HandleToShowTime.GetValue(szHandle, iShowTime);
   if (bIsHandlePanel) {
-    g_hCurrentPanel[iClient] = hHandle;
+    g_hCurrentPanel[iClient] = view_as<Panel>(hHandle);
     SendPanelToClient(hHandle, iClient, Handle_Panel, iShowTime);
   }
   else {
@@ -381,7 +380,7 @@ public int Handle_Menu(Menu hMenu, MenuAction action, int iClient, int iSlot)
       bool bIsHandlePanel;
       g_hTrie_HandleToHandleType.GetValue(szBackHandle, bIsHandlePanel);
       if (bIsHandlePanel) {
-        g_hCurrentPanel[iClient] = hBackHandle;
+        g_hCurrentPanel[iClient] = view_as<Panel>(hBackHandle);
         SendPanelToClient(hBackHandle, iClient, Handle_Panel, MENU_TIME_FOREVER);
       }
       else {
@@ -389,6 +388,7 @@ public int Handle_Menu(Menu hMenu, MenuAction action, int iClient, int iSlot)
       }
     }
   }
+  return 0;
 }
 
 public int Handle_Panel(Menu hMenu, MenuAction action, int iClient, int iSlot)
@@ -408,6 +408,7 @@ public int Handle_Panel(Menu hMenu, MenuAction action, int iClient, int iSlot)
     ReplaceUserAliases(iClient, szCommand, sizeof(szCommand));
     MyServerCommand(szCommand, sizeof(szCommand));
   }
+  return 0;
 }
 
 void ReplaceUserAliases(int iClient, char[] szString, int iMaxLen)
@@ -443,7 +444,7 @@ public Action Command_OpenMenu(int iArgc)
     int iShowTime; g_hTrie_NameToShowTime.GetValue(szHandleName, iShowTime);
     g_hTrie_HandleToHandleType.GetValue(szHandle, bIsHandlePanel);
     if (bIsHandlePanel) {
-      g_hCurrentPanel[iClient] = hHandle;
+      g_hCurrentPanel[iClient] = view_as<Panel>(hHandle);
       SendPanelToClient(hHandle, iClient, Handle_Panel, iShowTime);
     }
     else {
@@ -526,23 +527,6 @@ public int Handle_List(Menu hMenu, MenuAction action, int iClient, int iSlot)
     ReplaceAliases(szCommand);
     ReplaceUserAliases(iClient, szCommand, sizeof(szCommand));
     
-    /*char szSubStr[32];
-    int iOpenPos = StrContains(szCommand, "{"), iClosePos;
-    while ( iOpenPos != -1 ) {
-      iClosePos = StrContains(szCommand, "}");
-      strcopy(szSubStr, iClosePos-iOpenPos, szCommand[iOpenPos+1]);
-      
-      if ( GetTrieString(g_hTrie_ClientCookies[iClient], szSubStr, szInfo, sizeof(szInfo)) ) {
-        Format(szSubStr, sizeof(szSubStr), "{%s}", szSubStr);
-        ReplaceString(szCommand, sizeof(szCommand), szSubStr, szInfo);
-      }
-      else {
-        LogError("unexpected bracket in: %s", szCommand);
-        break;
-      }
-      
-      iOpenPos = StrContains(szCommand, "{");
-    }*/
     Format(szBuffer, sizeof(szBuffer), "{%s}", szBuffer);
     ReplaceString(szCommand, sizeof(szCommand), szBuffer, szInfo);
     
@@ -560,7 +544,7 @@ public int Handle_List(Menu hMenu, MenuAction action, int iClient, int iSlot)
       bool bIsHandlePanel;
       g_hTrie_HandleToHandleType.GetValue(szBackHandle, bIsHandlePanel);
       if (bIsHandlePanel) {
-        g_hCurrentPanel[iClient] = hBackHandle;
+        g_hCurrentPanel[iClient] = view_as<Panel>(hBackHandle);
         SendPanelToClient(hBackHandle, iClient, Handle_Panel, MENU_TIME_FOREVER);
       }
       else {
@@ -568,8 +552,8 @@ public int Handle_List(Menu hMenu, MenuAction action, int iClient, int iSlot)
       }
     }
   }
+  return 0;
 }
-
 
 public Action Command_OpenDynamicList(int iArgc)
 {
@@ -666,7 +650,7 @@ public int Handle_DynamicList(Menu hMenu, MenuAction action, int iClient, int iS
       bool bIsHandlePanel;
       g_hTrie_HandleToHandleType.GetValue(szBackHandle, bIsHandlePanel);
       if (bIsHandlePanel) {
-        g_hCurrentPanel[iClient] = hBackHandle;
+        g_hCurrentPanel[iClient] = view_as<Panel>(hBackHandle);
         SendPanelToClient(hBackHandle, iClient, Handle_Panel, MENU_TIME_FOREVER);
       }
       else {
@@ -677,6 +661,7 @@ public int Handle_DynamicList(Menu hMenu, MenuAction action, int iClient, int iS
   else if (action == MenuAction_End) {
     CloseHandle(hMenu);
   }
+  return 0;
 }
 
 void MyServerCommand(char[] szCommand, int iLen)
