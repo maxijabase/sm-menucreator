@@ -4,7 +4,7 @@ A reupload of AlexTheRegent's Menu Creator plugin with quality of life fixes.
 
 ## Original
 - Author: AlexTheRegent
-- Original thread: http://hlmod.ru/forum/showthread.php?t=18977
+- Original repository: https://github.com/AlexTheRegent/Sourcemod-Menu-Creator
 
 ## Installation
 1. Place `menucreator.smx` in your `addons/sourcemod/plugins` folder
