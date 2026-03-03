@@ -5,14 +5,14 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "3.1"
+#define PLUGIN_VERSION "3.2"
 public Plugin myinfo = 
 {
   name = "Menu Creator", 
-  author = "AlexTheRegent", 
+  author = "AlexTheRegent, fork by ampere", 
   description = "Simple creating of menu and panels for Source Games", 
   version = PLUGIN_VERSION, 
-  url = "http://hlmod.ru/forum/showthread.php?t=18977"
+  url = "https://github.com/maxijabase/sm-menucreator"
 }
 
 StringMap g_hTrie_NameToHandle;
@@ -29,6 +29,10 @@ StringMap g_hTrie_ClientCookies[MAXPLAYERS + 1];
 Panel g_hCurrentPanel[MAXPLAYERS + 1];
 char g_szOnClientPostAdminCheck[256];
 
+char g_szCurrentHandleName[32];
+ArrayList g_hOpenOnJoinHandles;
+bool g_bClientFirstPIA[MAXPLAYERS + 1];
+
 public void OnPluginStart()
 {
   // initialization of variables
@@ -42,7 +46,12 @@ public void OnPluginStart()
   
   LoadTranslations("core.phrases");
 
+  g_hOpenOnJoinHandles = new ArrayList(ByteCountToCells(32));
   BuildCustomMenus();
+
+  if (g_hOpenOnJoinHandles.Length > 0) {
+    HookEvent("inventory_post_application", Event_InventoryPostApplication);
+  }
   
   RegServerCmd("sm_mc_om", Command_OpenMenu);
   RegServerCmd("sm_mc_ol", Command_OpenList);
@@ -118,6 +127,11 @@ void BuildCustomMenus() {
           LogError("error in line: \"%s\" ", szLine);
         }
       }
+      else if (!strcmp(szBuffer[0], "openonjoin", false)) {
+        if (!SetOpenOnJoin(szBuffer[1])) {
+          LogError("error in line: \"%s\" ", szLine);
+        }
+      }
     }
   }
 }
@@ -132,6 +146,7 @@ public void OnConfigsExecuted()
 public void OnClientPutInServer(int client)
 {
   g_hTrie_ClientCookies[client] = new StringMap();
+  g_bClientFirstPIA[client] = false;
 }
 
 public void OnClientPostAdminCheck(int iClient)
@@ -148,6 +163,8 @@ public void OnClientDisconnect(int client)
 
 bool InitHandle(char[] szHandleName, char[] szType)
 {
+  strcopy(g_szCurrentHandleName, sizeof(g_szCurrentHandleName), szHandleName);
+
   if (!strcmp(szType, "menu")) {
     g_hCurrentHandle = new Menu(Handle_Menu);
     g_bIsHandlePanel = false;
@@ -330,6 +347,60 @@ bool SetTime(char[] szHandleName, char[] szTime)
   g_hTrie_HandleToShowTime.SetValue(szHandle, iTime);
   g_hTrie_NameToShowTime.SetValue(szHandleName, iTime);
   return true;
+}
+
+bool SetOpenOnJoin(char[] szValue)
+{
+  if (g_hCurrentHandle == null) {
+    LogError("current handle is null");
+    return false;
+  }
+
+  if (!strcmp(szValue, "1") || !strcmp(szValue, "yes", false) || !strcmp(szValue, "true", false)) {
+    g_hOpenOnJoinHandles.PushString(g_szCurrentHandleName);
+  }
+
+  return true;
+}
+
+public void Event_InventoryPostApplication(Event event, const char[] name, bool dontBroadcast)
+{
+  int iClient = GetClientOfUserId(event.GetInt("userid"));
+  if (iClient < 1 || iClient > MaxClients || !IsClientInGame(iClient) || IsFakeClient(iClient))
+    return;
+
+  if (g_bClientFirstPIA[iClient])
+    return;
+
+  g_bClientFirstPIA[iClient] = true;
+
+  char szHandleName[32];
+  for (int i = 0; i < g_hOpenOnJoinHandles.Length; i++)
+  {
+    g_hOpenOnJoinHandles.GetString(i, szHandleName, sizeof(szHandleName));
+
+    Handle hHandle;
+    if (g_hTrie_NameToHandle.GetValue(szHandleName, hHandle))
+    {
+      char szHandle[16];
+      FormatEx(szHandle, sizeof(szHandle), "%d", hHandle);
+
+      bool bIsHandlePanel;
+      int iShowTime;
+      g_hTrie_HandleToShowTime.GetValue(szHandle, iShowTime);
+      g_hTrie_HandleToHandleType.GetValue(szHandle, bIsHandlePanel);
+
+      if (bIsHandlePanel)
+      {
+        g_hCurrentPanel[iClient] = view_as<Panel>(hHandle);
+        SendPanelToClient(hHandle, iClient, Handle_Panel, iShowTime);
+      }
+      else
+      {
+        DisplayMenu(hHandle, iClient, iShowTime);
+      }
+    }
+  }
 }
 
 void ReplaceAliases(char[] szString)
